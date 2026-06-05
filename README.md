@@ -22,7 +22,9 @@ cd Personal-Data-Masking
 ### 2. Sanal Ortam Oluştur
 
 ```bash
-python -m venv venv veya py -m venv venv
+python -m venv venv
+veya
+py -m venv venv
 ```
 
 ### 3. Sanal Ortamı Aktif Et
