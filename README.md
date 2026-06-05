@@ -15,7 +15,7 @@ Doğal dil işleme (NLP) tabanlı bu uygulama, FastAPI ile geliştirilmiş bir w
 ### 1. Projeyi Klonla
 
 ```bash
-git clone https://github.com/kullanici-adin/proje-adi.git
+git clone https://github.com/Chesteak/Personal-Data-Masking
 cd proje-adi
 ```
 
