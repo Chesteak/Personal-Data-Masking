@@ -16,7 +16,7 @@ Doğal dil işleme (NLP) tabanlı bu uygulama, FastAPI ile geliştirilmiş bir w
 
 ```bash
 git clone https://github.com/Chesteak/Personal-Data-Masking
-cd proje-adi
+cd Personal-Data-Masking
 ```
 
 ### 2. Sanal Ortam Oluştur
