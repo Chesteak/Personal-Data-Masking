@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KVKK Maskeleme Motoru</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --accent: #e63946;
+    --accent2: #457b9d;
+    --accent3: #2a9d8f;
+    --text: #e8e8f0;
+    --muted: #888899;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Syne', sans-serif;
+
+    --tag-ad: #7c3aed;
+    --tag-soyad: #059669;
+    --tag-lok: #2563eb;
+    --tag-tc: #dc2626;
+    --tag-iban: #d97706;
+    --tag-tel: #db2777;
+    --tag-eposta: #7c3aed;
+    --tag-tarih: #64748b;
+    --tag-tutar: #b45309;
+    --tag-yas: #0891b2;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(70,123,157,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(70,123,157,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .shield-icon {
+    width: 48px; height: 48px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 20%, 100% 60%, 50% 100%, 0% 60%, 0% 20%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    box-shadow: 0 0 30px rgba(230,57,70,0.4);
+  }
+
+  h1 {
+    font-size: clamp(24px, 4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    font-family: var(--mono);
+    margin-top: 4px;
+  }
+
+  #status-bar {
+    margin: 20px 0;
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.3s;
+  }
+
+  #status-bar.hazir { border-color: var(--accent3); }
+  #status-bar.hata  { border-color: var(--accent); }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.aktif { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+  .status-dot.yukleniyor {
+    background: #f59e0b;
+    animation: pulse 1s infinite;
+    box-shadow: 0 0 8px #f59e0b;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .stat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .stat-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+
+  .stat-chip strong { color: var(--text); }
+
+  .options-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+  }
+
+  .censor-mode-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .censor-mode-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .censor-mode-opts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .cmode-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .cmode-btn:hover { border-color: var(--muted); color: var(--text); }
+  .cmode-btn.selected {
+    background: var(--accent2);
+    border-color: var(--accent2);
+    color: #fff;
+  }
+
+  /* Yıldız alt seçenekleri */
+  .star-sub {
+    display: none;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+  .star-sub.visible { display: flex; }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 16px 0;
+  }
+
+  @media (max-width: 768px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface2);
+  }
+
+  .panel-header strong { color: var(--text); font-size: 13px; }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 16px;
+    resize: none;
+    height: 260px;
+    outline: none;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  #output-panel {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 16px;
+    height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--muted);
+  }
+
+  #output-panel.has-content { color: var(--text); }
+
+  .tag {
+    display: inline;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .tag-tc     { background: var(--tag-tc);     color: #fff; }
+  .tag-iban   { background: var(--tag-iban);   color: #fff; }
+  .tag-tel    { background: var(--tag-tel);    color: #fff; }
+  .tag-eposta { background: var(--tag-eposta); color: #fff; }
+  .tag-tarih  { background: var(--tag-tarih);  color: #fff; }
+  .tag-ad     { background: var(--tag-ad);     color: #fff; }
+  .tag-soyad  { background: var(--tag-soyad);  color: #fff; }
+  .tag-lok    { background: var(--tag-lok);    color: #fff; }
+  .tag-tutar  { background: var(--tag-tutar);  color: #fff; }
+  .tag-yas    { background: var(--tag-yas);    color: #fff; }
+
+  .star-censor {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .toolbar {
+    padding: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: var(--surface2); border-color: var(--muted); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 24px;
+  }
+
+  .btn-primary:hover { background: #c1121f; border-color: #c1121f; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .separator { flex: 1; }
+
+  #stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+    min-height: 50px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    text-align: center;
+    min-width: 90px;
+    animation: slideIn 0.3s ease both;
+  }
+
+  @keyframes slideIn {
+    from { opacity:0; transform:translateY(8px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .stat-card .num {
+    font-size: 22px;
+    font-weight: 800;
+    font-family: var(--mono);
+    display: block;
+  }
+
+  .stat-card .lbl {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 2px;
+    display: block;
+  }
+
+  .stat-tc     { border-color: var(--tag-tc);     color: var(--tag-tc); }
+  .stat-iban   { border-color: var(--tag-iban);   color: var(--tag-iban); }
+  .stat-tel    { border-color: var(--tag-tel);    color: var(--tag-tel); }
+  .stat-eposta { border-color: var(--tag-eposta); color: var(--tag-eposta); }
+  .stat-tarih  { border-color: var(--tag-tarih);  color: var(--tag-tarih); }
+  .stat-ad     { border-color: var(--tag-ad);     color: var(--tag-ad); }
+  .stat-soyad  { border-color: var(--tag-soyad);  color: var(--tag-soyad); }
+  .stat-lok    { border-color: var(--tag-lok);    color: var(--tag-lok); }
+  .stat-tutar  { border-color: var(--tag-tutar);  color: var(--tag-tutar); }
+  .stat-yas    { border-color: var(--tag-yas);    color: var(--tag-yas); }
+
+  .ornek-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 0;
+    margin-top: 40px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #copy-toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--accent3);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 999;
+  }
+  #copy-toast.show { opacity: 1; transform: translateY(0); }
+
+  .pdf-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .pdf-section-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pdf-drop-area {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    position: relative;
+  }
+
+  .pdf-drop-area:hover,
+  .pdf-drop-area.drag-over {
+    border-color: var(--accent2);
+    background: rgba(69,123,157,0.05);
+    color: var(--text);
+  }
+
+  .pdf-drop-area input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .pdf-drop-icon { font-size: 28px; margin-bottom: 8px; }
+
+  .pdf-selected {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pdf-selected.visible { display: flex; }
+
+  .btn-pdf {
+    background: var(--accent2);
+    border-color: var(--accent2);
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn-pdf:hover { background: #2c5f7a; border-color: #2c5f7a; }
+  .btn-pdf:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .pdf-status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 10px;
+    min-height: 20px;
+  }
+  .pdf-status.ok  { color: var(--accent3); }
+  .pdf-status.err { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-row">
+      <div class="shield-icon">🛡</div>
+      <div>
+        <h1>KVKK <span>Maskeleme</span> Motoru</h1>
+        <div class="subtitle">// Türkçe metinlerdeki kişisel verileri otomatik tespit ve maskele</div>
+      </div>
+    </div>
+  </header>
+
+  <div id="status-bar">
+    <div class="status-dot yukleniyor" id="status-dot"></div>
+    <span id="status-text">Dataset indiriliyor...</span>
+    <div class="stat-chips" id="stat-chips"></div>
+  </div>
+
+  <div id="stats-row"></div>
+
+  <div class="options-row">
+
+    <div class="censor-mode-box">
+      <div class="censor-mode-label">Sansür Görünümü</div>
+      <div class="censor-mode-opts">
+        <button class="cmode-btn selected" data-mode="renkli" onclick="setCensorMode('renkli')">🏷 Renkli Etiket</button>
+        <button class="cmode-btn" data-mode="yildiz" onclick="setCensorMode('yildiz')">★ Yıldız</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <strong>📝 GİRİŞ METNİ</strong>
+        <span id="char-count">0 karakter</span>
+      </div>
+      <textarea id="giris" placeholder="Maskelenecek metni buraya yazın veya yapıştırın...
+
+Örnek: Ahmet Yılmaz'ın TC numarası 12345678900, telefonu 0532 123 45 67
+IBAN: TR12 3456 7890 1234 5678 9012 34
+Tutar: 4.500 TL"></textarea>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <strong>🛡️ MASKELENMİŞ ÇIKTI</strong>
+        <button class="btn" onclick="kopyala()" style="padding:4px 10px;font-size:11px;">📋 Kopyala</button>
+      </div>
+      <div id="output-panel">Maskelenmiş metin burada görünecek...</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" id="btn-maskele" onclick="maskele()" disabled>
+      <span id="btn-icerik">⏳ Yükleniyor...</span>
+    </button>
+
+    <button class="btn" onclick="temizle()">🗑 Temizle</button>
+
+    <div class="separator"></div>
+
+    <span class="ornek-label">Örnekler:</span>
+    <button class="btn" onclick="ornek(0)">📄 Kimlik</button>
+    <button class="btn" onclick="ornek(1)">💳 Finans</button>
+  </div>
+
+  <div class="pdf-section">
+    <div class="pdf-section-title">📄 PDF Maskeleme</div>
+
+    <div class="pdf-drop-area" id="pdf-drop-area">
+      <input type="file" id="pdf-input" accept=".pdf" onchange="pdfSecildi(this)">
+      <div class="pdf-drop-icon">📁</div>
+      <div>PDF dosyasını buraya sürükleyin veya tıklayın</div>
+      <div style="margin-top:4px;font-size:11px;">Yalnızca dijital PDF (metin kopyalanabilir türde)</div>
+    </div>
+
+    <div class="pdf-selected" id="pdf-selected">
+      <span>📄</span>
+      <span id="pdf-dosya-adi">—</span>
+      <span id="pdf-dosya-boyut" style="color:var(--muted);margin-left:auto;"></span>
+    </div>
+
+    <div class="toolbar" style="margin-top:12px;padding-top:0;">
+      <button class="btn btn-pdf" id="btn-pdf-maskele" onclick="pdfMaskele()" disabled>
+        <span id="btn-pdf-icerik">🛡️ PDF'i Maskele & İndir</span>
+      </button>
+      <button class="btn" onclick="pdfTemizle()">🗑 Sıfırla</button>
+    </div>
+
+    <div class="pdf-status" id="pdf-status"></div>
+  </div>
+
+  <footer>
+    KVKK Maskeleme Motoru &nbsp;·&nbsp; FastAPI + Vanilla JS &nbsp;·&nbsp;
+    Türkiye Kişisel Verilerin Korunması Kanunu (6698)
+  </footer>
+</div>
+
+<div id="copy-toast">✓ Panoya kopyalandı</div>
+
+<script>
+const API = window.location.origin;
+
+let censorMode = 'renkli';  
+
+let sonHamMetin = '';        
+
+const ORNEKLER = [
+  `Müşteri: Mustafa Demir
+TC No: 23456789012
+Telefon: 0532 123 45 67
+IBAN: TR32 0006 1005 1978 6457 8413 26
+E-posta: mustafa.demir@mail.com
+Borç tutarı: 1.250 TL
+Adres: Ankara, Çankaya, Kızılay`,
+
+  `FATURA BİLGİLERİ
+Alıcı: Fatma Şahin
+TC Kimlik: 98765432100
+Banka: Türkiye Garanti Bankası
+IBAN: TR12 0006 2001 4920 0006 2974 25
+Tutar: 4.500 TL
+İşlem Tarihi: 15.03.2024
+İletişim: fatma.sahin@example.com — +90 532 111 22 33`,
+];
+
+const TAG_MAP_RENKLI = {
+  '[TC_KIMLIK_SANSURLENDI]': `<span class="tag tag-tc">TC KİMLİK</span>`,
+  '[IBAN_SANSURLENDI]':      `<span class="tag tag-iban">IBAN</span>`,
+  '[TELEFON_SANSURLENDI]':   `<span class="tag tag-tel">TELEFON</span>`,
+  '[EPOSTA_SANSURLENDI]':    `<span class="tag tag-eposta">E-POSTA</span>`,
+  '[TARIH_SANSURLENDI]':     `<span class="tag tag-tarih">TARİH</span>`,
+  '[TUTAR_SANSURLENDI]':     `<span class="tag tag-tutar">TUTAR</span>`,
+  '[PER_SANSURLENDI]':       `<span class="tag tag-ad">KİŞİ</span>`,
+  '[LOKASYON_SANSURLENDI]':  `<span class="tag tag-lok">LOKASYON</span>`,
+  '[YAS_SANSURLENDI]':       `<span class="tag tag-yas">YAŞ</span>`,
+};
+
+const TAG_MAP_YILDIZ_TAM = {
+  '[TC_KIMLIK_SANSURLENDI]': '***********',
+  '[IBAN_SANSURLENDI]':      '**********************',
+  '[TELEFON_SANSURLENDI]':   '***********',
+  '[EPOSTA_SANSURLENDI]':    '***@***',
+  '[TARIH_SANSURLENDI]':     '**.**.**',
+  '[TUTAR_SANSURLENDI]':     '*** TL',
+  '[PER_SANSURLENDI]':       '***',
+  '[LOKASYON_SANSURLENDI]':  '***',
+  '[YAS_SANSURLENDI]':       '**',
+};
+
+const TAG_MAP_YILDIZ_ILK = {
+  '[TC_KIMLIK_SANSURLENDI]': (s) => 'X**********',
+  '[IBAN_SANSURLENDI]':      (s) => 'T*********************',
+  '[TELEFON_SANSURLENDI]':   (s) => '0**********',
+  '[EPOSTA_SANSURLENDI]':    (s) => '*@***',
+  '[TARIH_SANSURLENDI]':     (s) => '**.**.**',
+  '[TUTAR_SANSURLENDI]':     (s) => '***.** TL',
+  '[PER_SANSURLENDI]':       (s) => 'X**',
+  '[LOKASYON_SANSURLENDI]':  (s) => 'X**',
+  '[YAS_SANSURLENDI]':       (s) => '*',
+};
+
+const STAT_META = {
+  TC_KIMLIK: { lbl: 'TC Kimlik',  cls: 'stat-tc' },
+  IBAN:      { lbl: 'IBAN',       cls: 'stat-iban' },
+  TELEFON:   { lbl: 'Telefon',    cls: 'stat-tel' },
+  EPOSTA:    { lbl: 'E-posta',    cls: 'stat-eposta' },
+  TARIH:     { lbl: 'Tarih',      cls: 'stat-tarih' },
+  TUTAR:     { lbl: 'Tutar',      cls: 'stat-tutar' },
+  PER:       { lbl: 'Kişi',       cls: 'stat-ad' },
+  LOKASYON:  { lbl: 'Lokasyon',   cls: 'stat-lok' },
+  YAS:       { lbl: 'Yaş',        cls: 'stat-yas' },
+};
+
+function setCensorMode(mode) {
+  censorMode = mode;
+  document.querySelectorAll('.cmode-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.mode === mode);
+  });
+  // Mevcut çıktıyı yeniden render et
+  if (sonMaskelenmis) renderCikti(sonMaskelenmis);
+}
+
+function renderCikti(ham) {
+  const out = document.getElementById('output-panel');
+  if (!ham) return;
+  
+  let html = escapeHtml(ham);
+
+  if (censorMode === 'renkli') {
+    for (const [token, tag] of Object.entries(TAG_MAP_RENKLI)) {
+      html = html.split(escapeHtml(token)).join(tag);
+    }
+  } else if (censorMode === 'yildiz-tam') {
+    for (const [token, rep] of Object.entries(TAG_MAP_YILDIZ_TAM)) {
+      html = html.split(escapeHtml(token)).join(`<span class="star-censor">${rep}</span>`);
+    }
+  } else if (censorMode === 'yildiz-ilk') {
+    for (const [token, fn] of Object.entries(TAG_MAP_YILDIZ_ILK)) {
+      html = html.split(escapeHtml(token)).join(`<span class="star-censor">${fn(token)}</span>`);
+    }
+  }
+
+  out.innerHTML = html;
+  out.className = 'has-content';
+}
+
+async function durumKontrol() {
+  try {
+    const r = await fetch(`${API}/durum`);
+    const d = await r.json();
+
+    const dot = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+    const bar = document.getElementById('status-bar');
+    const btn = document.getElementById('btn-maskele');
+    const btnTxt = document.getElementById('btn-icerik');
+    const chips = document.getElementById('stat-chips');
+
+    if (d.hazir) {
+      dot.className = 'status-dot aktif';
+      txt.textContent = '✓ Model hazır — spaCy NER aktif';
+      bar.className = 'hazir';
+      btn.disabled = false;
+      btnTxt.textContent = '🛡️ Maskele';
+      chips.innerHTML = `<div class="stat-chip"><strong>spaCy</strong> NER</div><div class="stat-chip"><strong>11</strong> etiket</div>`;
+    } else {
+      dot.className = 'status-dot yukleniyor';
+      txt.textContent = '⏳ ' + d.mesaj;
+      setTimeout(durumKontrol, 2000);
+    }
+  } catch (e) {
+    setTimeout(durumKontrol, 3000);
+  }
+}
+
+async function maskele() {
+  const metin = document.getElementById('giris').value.trim();
+  if (!metin) return;
+
+  const btn = document.getElementById('btn-maskele');
+  const btnTxt = document.getElementById('btn-icerik');
+  const out = document.getElementById('output-panel');
+
+  btn.disabled = true;
+  btnTxt.innerHTML = '<span class="spinner"></span> İşleniyor...';
+  out.className = '';
+  out.innerHTML = '<span style="color:var(--muted)">İşleniyor...</span>';
+  document.getElementById('stats-row').innerHTML = '';
+
+  try {
+    const r = await fetch(`${API}/maskele`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metin })
+    });
+    const d = await r.json();
+
+    if (d.hata) {
+      out.innerHTML = `<span style="color:var(--accent)">Hata: ${d.hata}</span>`;
+      return;
+    }
+
+    sonMaskelenmis = d.maskelenmis;
+    renderCikti(sonMaskelenmis);
+
+    // İstatistik kartları
+    const statsRow = document.getElementById('stats-row');
+    statsRow.innerHTML = '';
+    let any = false;
+    for (const [key, meta] of Object.entries(STAT_META)) {
+      const val = d.sayac[key] || 0;
+      if (val > 0) {
+        any = true;
+        statsRow.innerHTML += `
+          <div class="stat-card ${meta.cls}">
+            <span class="num">${val}</span>
+            <span class="lbl">${meta.lbl}</span>
+          </div>`;
+      }
+    }
+    if (d.sayac.TC_ATLA > 0) {
+      statsRow.innerHTML += `
+        <div class="stat-card" style="border-color:#334155;color:#64748b">
+          <span class="num">${d.sayac.TC_ATLA}</span>
+          <span class="lbl">TC (atlandı)</span>
+        </div>`;
+    }
+    if (!any && !d.sayac.TC_ATLA) {
+      statsRow.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:10px 0;font-family:var(--mono)">Kişisel veri tespit edilmedi.</div>`;
+    }
+
+  } catch (e) {
+    out.innerHTML = `<span style="color:var(--accent)">Bağlantı hatası: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+    btnTxt.textContent = '🛡️ Maskele';
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function temizle() {
+  document.getElementById('giris').value = '';
+  document.getElementById('output-panel').className = '';
+  document.getElementById('output-panel').innerHTML = 'Maskelenmiş metin burada görünecek...';
+  document.getElementById('stats-row').innerHTML = '';
+  document.getElementById('char-count').textContent = '0 karakter';
+  sonMaskelenmis = '';
+}
+
+function ornek(idx) {
+  document.getElementById('giris').value = ORNEKLER[idx];
+  document.getElementById('char-count').textContent = ORNEKLER[idx].length + ' karakter';
+}
+
+async function kopyala() {
+  const out = document.getElementById('output-panel');
+  const text = out.innerText;
+  try {
+    await navigator.clipboard.writeText(text);
+    const toast = document.getElementById('copy-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  } catch (e) {}
+}
+
+let secilenPdf = null;
+
+function pdfSecildi(input) {
+  const dosya = input.files[0];
+  if (!dosya) return;
+  secilenPdf = dosya;
+
+  document.getElementById('pdf-dosya-adi').textContent = dosya.name;
+  document.getElementById('pdf-dosya-boyut').textContent =
+    (dosya.size / 1024).toFixed(1) + ' KB';
+  document.getElementById('pdf-selected').classList.add('visible');
+  document.getElementById('btn-pdf-maskele').disabled = false;
+  document.getElementById('pdf-status').textContent = '';
+  document.getElementById('pdf-status').className = 'pdf-status';
+}
+
+function pdfTemizle() {
+  secilenPdf = null;
+  document.getElementById('pdf-input').value = '';
+  document.getElementById('pdf-selected').classList.remove('visible');
+  document.getElementById('btn-pdf-maskele').disabled = true;
+  document.getElementById('pdf-status').textContent = '';
+  document.getElementById('pdf-status').className = 'pdf-status';
+  document.getElementById('pdf-dosya-adi').textContent = '—';
+}
+
+async function pdfMaskele() {
+  if (!secilenPdf) return;
+
+  const btn = document.getElementById('btn-pdf-maskele');
+  const btnTxt = document.getElementById('btn-pdf-icerik');
+  const durum = document.getElementById('pdf-status');
+
+  btn.disabled = true;
+  btnTxt.innerHTML = '<span class="spinner"></span> İşleniyor...';
+  durum.textContent = 'PDF işleniyor...';
+  durum.className = 'pdf-status';
+
+  try {
+    const form = new FormData();
+    form.append('dosya', secilenPdf);
+
+    const r = await fetch(`${API}/maskele-pdf`, {
+      method: 'POST',
+      body: form,
+    });
+
+    if (!r.ok) {
+      const hata = await r.json();
+      durum.textContent = '❌ Hata: ' + (hata.hata || r.statusText);
+      durum.className = 'pdf-status err';
+      return;
+    }
+
+    const toplam = r.headers.get('X-Toplam-Maske') || '?';
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = secilenPdf.name.replace('.pdf', '_maskelenmis.pdf');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    durum.textContent = `✓ Tamamlandı — ${toplam} alan maskelendi. İndirme başladı.`;
+    durum.className = 'pdf-status ok';
+
+  } catch (e) {
+    durum.textContent = '❌ Bağlantı hatası: ' + e.message;
+    durum.className = 'pdf-status err';
+  } finally {
+    btn.disabled = false;
+    btnTxt.textContent = '🛡️ PDF\'i Maskele & İndir';
+  }
+}
+
+const dropArea = document.getElementById('pdf-drop-area');
+if (dropArea) {
+  dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('drag-over'); });
+  dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
+  dropArea.addEventListener('drop', e => {
+    e.preventDefault();
+    dropArea.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type === 'application/pdf') {
+      const dt = new DataTransfer();
+      dt.items.add(f);
+      document.getElementById('pdf-input').files = dt.files;
+      pdfSecildi(document.getElementById('pdf-input'));
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('giris');
+  ta.addEventListener('input', () => {
+    document.getElementById('char-count').textContent = ta.value.length + ' karakter';
+  });
+  ta.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') maskele();
+  });
+  durumKontrol();
+});
+</script>
+</body>
+</html>
