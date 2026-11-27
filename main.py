@@ -3,7 +3,9 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from fastapi import HTTPException
+import os
 import threading
 import re
 import io
@@ -12,13 +14,16 @@ app = FastAPI(title="KVKK Maskeleme Motoru")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[x.strip() for x in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if x.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 MODEL_YOLU = "model_best_fixed"
+MAX_TEXT_LENGTH = 20000
+MAX_PDF_BYTES = 10 * 1024 * 1024
+MAX_PDF_PAGES = 30
 _durum = {"hazir": False, "mesaj": "Model yukleniyor..."}
 nlp = None
 
@@ -32,7 +37,7 @@ def model_yukle():
         _durum["mesaj"] = "Hazir"
         print(f"Model yuklendi — etiketler: {nlp.get_pipe('ner').labels}")
     except Exception as e:
-        _durum["mesaj"] = f"Model yuklenemedi: {e}"
+        _durum["mesaj"] = "Model yüklenemedi."
         print(f"HATA: {e}")
 
 
@@ -146,7 +151,7 @@ def maskele_metin(metin: str, ayarlar: dict = None, stil: str = "etiket"):
 
 
 class MaskelemeIstegi(BaseModel):
-    metin: str
+    metin: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     maske_kisi: bool = True
     maske_adres: bool = True
     maske_tc: bool = True
@@ -154,7 +159,7 @@ class MaskelemeIstegi(BaseModel):
     maske_telefon: bool = True
     maske_eposta: bool = True
     maske_tutar: bool = True
-    stil: str = "etiket"
+    stil: str = Field(default="etiket", pattern="^(etiket|yildiz)$")
 
     def ayarlar(self):
         return {
@@ -207,14 +212,29 @@ async def maskele_pdf(
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
     except ImportError as e:
-        return JSONResponse(status_code=500, content={"hata": f"Eksik kütüphane: {e}"})
+        return JSONResponse(status_code=500, content={"hata": "PDF işleme bileşeni kullanılamıyor."})
 
-    icerik = await dosya.read()
+    if not dosya.filename or not dosya.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Yalnızca PDF dosyaları kabul edilir.")
+    if dosya.size is not None and dosya.size > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF dosyası çok büyük.")
+    icerik = await dosya.read(MAX_PDF_BYTES + 1)
+    if len(icerik) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF dosyası çok büyük.")
+    if not icerik.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="Geçersiz PDF dosyası.")
     toplam_sayac = {k: 0 for k in ["KISI", "TC_KIMLIK", "TC_ATLA", "IBAN",
                                      "TELEFON", "EPOSTA", "TUTAR", "ADRES"]}
 
     sayfalar = []
-    with pdfplumber.open(io.BytesIO(icerik)) as pdf:
+    try:
+        pdf_doc = pdfplumber.open(io.BytesIO(icerik))
+    except Exception:
+        raise HTTPException(status_code=400, detail="PDF dosyası okunamadı.")
+
+    with pdf_doc as pdf:
+        if len(pdf.pages) > MAX_PDF_PAGES:
+            raise HTTPException(status_code=413, detail="PDF çok fazla sayfa içeriyor.")
         for sayfa in pdf.pages:
             metin = sayfa.extract_text() or ""
             if metin.strip():
@@ -272,7 +292,7 @@ async def maskele_pdf(
     buffer.seek(0)
 
     toplam = sum(v for k, v in toplam_sayac.items() if k != "TC_ATLA")
-    dosya_adi = dosya.filename.replace('.pdf', '_maskelenmis.pdf')
+    dosya_adi = "masked_document.pdf"
 
     return StreamingResponse(
         buffer,
